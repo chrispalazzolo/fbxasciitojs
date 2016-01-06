@@ -1,0 +1,16 @@
+{
+  "name": "fbxasciitojs",
+  "version": "0.0.0",
+  "description": "A .fbx ascii file parser.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "fbx",
+    "ascii",
+    "3d"
+  ],
+  "author": "Chris Palazzolo",
+  "license": "MIT"
+}
