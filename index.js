@@ -153,6 +153,7 @@ function processObject(){
 			obj['comments'].push(c);
 		}
 		else if(line.indexOf('}') > -1){
+			console.log(obj)
 			return obj;
 		}
 		else if(line.indexOf('{') > -1){
