@@ -143,33 +143,101 @@ function processObject(){
 
 	for(l_num; l_num <= last_line; l_num++){
 		line = lines[l_num];
+		line = line.trim();
 
 		if(line == undefined || line == '' || line == null) continue;
 		
-		if(line.charAt(0) == ";"){
+		if(line.charAt(0) == ";"){ // comments
 			if(!obj['comments']) obj['comments'] = [];
 			var c = line.replace(';', '') + " (found @ line: " + l_num + ")";
 			write("Parsing Comment: " + c);
 			obj['comments'].push(c);
 		}
-		else if(line.indexOf('}') > -1){
-			console.log(obj)
+		else if(line.indexOf('}') > -1){ // end of object
 			return obj;
 		}
-		else if(line.indexOf('{') > -1){
-			var obj_name = line.split(':')[0];
-			write("Parsing Object: " + obj_name);
+		else if(line.indexOf('{') > -1){ // start of an object
+			var o = processObjectName(line);
+			var n = o['name'];
+			var g = o['group'];
+			var t = o['type'];
+			var oidx = g || n;
+			var r_obj = null;
+
+			write("Parsing Object: Name: " + n + ", Type: " + t + ", Group: " + g);
+			
 			l_num++;
-			obj[obj_name] = processObject();
+			
+			r_obj = processObject();
+
+			if(t){
+				r_obj["ObjectType"] = t;
+			}
+
+			if(g){
+				if(!obj[g]) obj[g] = {};
+				obj[g][n] = r_obj;
+			}
+			else{
+				obj[n] = r_obj;
+			}
 		}
-		else if(line.indexOf(':') > -1){
+		else if(line.indexOf(':') > -1){ // key value pair
 			var key_val = line.split(':');
-			obj[key_val[0]] = key_val[1];
+			obj[key_val[0]] = processValue(key_val[1]);
 		}
-		else{
+		else{ // catch all
 			write("Unprocessed Line: " + line);
 		}
 	} // end for loop
+
+	return obj;
+}
+
+/* function to get the object name and possible type/description of the object.
+line data passed in as a string, returns {name: str, type: str|null} */
+// 1. ObjectName: { (ex: FBXHeaderExtension:)
+// 2. ObjectGroup: ObjectName { (ex: ObjectType: "Geometry")
+// 3. ObjectGroup: "ObjectGroup::ObjectName" { (ex: Model: "Model::Cube")
+// 4. ObjectGroup: "ObjectGroup::ObjectName", "ObjectType" { (ex: Model: "Model::Producer Top", "Camera")
+function processObjectName(s){
+	var d = {name: '', type:null, group: null};
+	if(s){
+		s = s.replace('{', '');
+		s = s.trim();
+		var ss = s.split(':');
+
+		d['group'] = ss[0];
+
+		if(ss.length <= 2){ // #1 || #2
+			if(!ss[1]){ // #1
+				d['name'] = ss[0];
+				d['group'] = null;
+			} else { // #2
+				d['name'] = ss[1];
+			}
+		}
+		else{ // #3 || #4
+			//ss = [0]=ObjectGroup, [1]=ObjectGroup, [2]=null, [3]=ObjectName (, ObjectType)
+			if(ss[3].indexOf(',') > -1){ // #4
+				var tnp = ss[3].split(',');
+				tnp[1] = tnp[1].trim();
+				d['name'] = tnp[0];
+				d['type'] = tnp[1];
+			}
+			else{ // #3
+				d['name'] = ss[3];
+			}
+		}
+
+		for(i in d){
+			if(d[i]){
+				d[i] = d[i].replace(/"/g, '').replace(/ /, '');
+			}
+		}
+	}
+
+	return d;
 }
 
 function processValue(val, type){
