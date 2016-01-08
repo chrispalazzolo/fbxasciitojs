@@ -183,11 +183,17 @@ function processObject(){
 			}
 		}
 		else if(line.indexOf(':') > -1){ // key value pair
-			var key_val = line.split(':');
-			obj[key_val[0]] = processValue(key_val[1]);
+			var kv = line.split(':');
+			if(kv[0].toLowerCase() == "property"){
+				var p = processProperty(kv[1]);
+				obj[p.name] = {type:p.type, flags: p.flags, value: p.value};
+			}
+			else{
+				obj[kv[0]] = processValue(kv[1]);
+			}
 		}
 		else{ // catch all
-			write("Unprocessed Line: " + line);
+			write("Unprocessed Line (@ " + l_num + "): " + line);
 		}
 	} // end for loop
 
@@ -240,25 +246,86 @@ function processObjectName(s){
 	return d;
 }
 
-function processValue(val, type){
-	if(val){
-		val = val.trim();
-		if(val.charAt(0) == '"'){ // is a string value
-			return val.replace(/"/g, '');
+function processProperty(p){
+	//Property = Name, Type, Flags, Value(s)....,....
+	var rp = {name: '', type: '', flags: '', value: null};
+	if(p){
+		p = cleanStr(p).replace(/, /g, ',');
+		if(p.indexOf(',') > -1){
+			var pv = p.split(',');
+			var n = pv[0];
+			var t = pv[1];
+			var f = pv[2];
+			var v = null;
+			if(pv.length > 4){
+				v = [];
+				for(var i = 3; i < pv.length; i++){
+					v.push(processValue(pv[i], t));
+				}
+			}
+			else{
+				v = processValue(pv[3], t);
+			}
+
+			rp['name'] = n;
+			rp['type'] = t;
+			rp['flags'] = f;
+			rp['value'] = v;
 		}
-		else if(val.indexOf('.') > -1){
-			return parseFloat(val);
-		}
-		else{
-			return parseInt(val);
+	}
+
+	return rp;
+}
+
+function processValue(v, t){
+	if(v != null && v != undefined){
+		v = v.trim();
+
+		switch(t){
+			case "double":
+			case "float":
+			case "Color":
+			case "color":
+			case "ColorRGBA":
+			case "colorrgba":
+				v = parseFloat(v);
+				break;
+			case "int":
+			case "enum":
+			case "bool":
+			case "Vector3D":
+			case "vector3d":
+				v = parseInt(v);
+				break;
+			default:
+				if(!isNaN(v)){
+					if(v.indexOf('.') > -1){
+						v = parseFloat(v);
+					} else {
+						v = parseInt(v);
+					}
+				}
+				else{
+					v = cleanStr(v);
+				}
+				break;
 		}
 	}
 	else{
-		write("Unprocessed Value: " + val);
-		val = null;
+		write("Unprocessed Value: " + v);
+		v = null;
 	}
 
-	return val;
+	return v;
+}
+
+// cleans a string of quotes and leading and trailing spaces, option: removes all spaces
+function cleanStr(s, rs){ //(s: string (string), rs: remove spaces (bool))
+	if(s){
+		s = s.replace(/"/g, '').trim();
+		if(rs) s = s.replace(/ /g, '');
+	}
+	return s;
 }
 
 function OpenFile(file, option, cbFunc){
