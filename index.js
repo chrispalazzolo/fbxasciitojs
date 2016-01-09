@@ -147,16 +147,21 @@ function processObject(){
 
 		if(line == undefined || line == '' || line == null) continue;
 		
-		if(line.charAt(0) == ";"){ // comments
-			if(!obj['comments']) obj['comments'] = [];
-			var c = line.replace(';', '') + " (found @ line: " + l_num + ")";
-			write("Parsing Comment: " + c);
-			obj['comments'].push(c);
+		// Comment
+		if(line.charAt(0) == ";"){
+			if(opts.parseComments){
+				if(!obj['comments']) obj['comments'] = [];
+				var c = line.replace(';', '') + " (found @ line: " + l_num + ")";
+				write("Parsing Comment: " + c);
+				obj['comments'].push(c);
+			}
 		}
-		else if(line.indexOf('}') > -1){ // end of object
+		// End of Object, return current object.
+		else if(line.indexOf('}') > -1){
 			return obj;
 		}
-		else if(line.indexOf('{') > -1){ // start of an object
+		// Start of an Object
+		else if(line.indexOf('{') > -1){
 			var o = processObjectName(line);
 			var n = o['name'];
 			var g = o['group'];
@@ -182,7 +187,8 @@ function processObject(){
 				obj[n] = r_obj;
 			}
 		}
-		else if(line.indexOf(':') > -1){ // key value pair
+		// Key Value Pair
+		else if(line.indexOf(':') > -1){
 			var kv = null;
 			if(line.indexOf('::') > -1){
 				var idx = line.indexOf(':');
@@ -192,45 +198,50 @@ function processObject(){
 				kv = line.split(':');
 			}
 			
+			write('Parsing Property "' + kv[0] + '": ' + kv[1]);
+
 			var p = kv[0];
 			var plc = p.toLowerCase();
+
+			// Property Property (ex: "Property:....") -------------------
 			if(plc == "property"){
 				var pd = processPropertyData(kv[1]);
 				obj[pd.name] = {type:pd.type, flags: pd.flags, value: pd.value};
 			}
+			// Connect Property ------------------------------------------
 			else if(plc == "connect"){
 				var cd = processConnectData(kv[1]);
 				if(!obj[p]) obj[p] = [];
 				obj[p].push(cd);
 			}
+			// Multi Value Property --------------------------------------
 			else if(kv[1].indexOf(',') > -1){
-				var continued = false; // Do the values span across multiple lines 
-				var d = kv[1];
-				obj[p] = [];
-				do{
-					continued = false;
-					d = cleanStr(d.replace(/, /g, ','));
-					if(d.charAt(d.length - 1) == ','){
-						continued = true;
-						d = d.slice(0, d.length - 1); // remove the last comma
-					}
-					d = d.split(',');
-					for(var i = 0; i < d.length; i++){
-						obj[p].push(processValue(d[i]));
-					}
-
-					if(continued && l_num < last_line && lines[l_num+1].indexOf(':') < 0){
-						l_num++;
-						d = lines[l_num];
-					}
-				}while(continued);
+				obj[p] = processMultiLineMultiValues(kv[1]);
 			}
+			// Property and Single Value ---------------------------------
 			else{
-				obj[kv[0]] = processValue(kv[1]);
+				var k = kv[0];
+				var v = kv[1];
+				var pattern = /[:}]/;
+				
+				if(!v || v == ' ' || v == null || v == undefined){
+					if(l_num < last_line && !pattern.test(lines[l_num + 1])){
+						l_num++;
+						v = lines[l_num];
+						write('Values for Property "' + k + '" found on next line: ' + v);
+						v = processMultiLineMultiValues(v);
+					}
+				}
+				else{
+					v = processValue(v);
+				}
+				
+				obj[k] = v;
 			}
 		}
-		else{ // catch all
-			write("Unprocessed Line (@ " + l_num + "): " + line);
+		// Catch All ---------------------------------------------------
+		else{
+			write("!!!Unprocessed Line (@ " + l_num + "): " + line);
 		}
 	} // end for loop
 
@@ -301,7 +312,8 @@ function processPropertyData(p){
 				}
 			}
 			else{
-				v = processValue(pv[3], t);
+				var pvi = pv.length - 1; //parse value index
+				v = processValue(pv[pvi], t);
 			}
 
 			rp['name'] = n;
@@ -333,6 +345,31 @@ function processConnectData(d){
 	return ro;
 }
 
+function processMultiLineMultiValues(d){
+	var vs = [];
+	var continued = false;
+	var pattern = /[}:]/;
+	do{
+		continued = false;
+		d = cleanStr(d.replace(/, /g, ','));
+		if(d.charAt(d.length - 1) == ','){
+			continued = true;
+			d = d.slice(0, d.length - 1); // remove the last comma
+		}
+		d = d.split(',');
+		for(var i = 0; i < d.length; i++){
+			vs.push(processValue(d[i]));
+		}
+
+		if(continued && l_num < last_line && !pattern.test(lines[l_num+1])){
+			l_num++;
+			d = lines[l_num];
+		}
+	}while(continued);
+
+	return vs;
+}
+
 function processValue(v, t){
 	if(v != null && v != undefined){
 		v = v.trim();
@@ -340,6 +377,8 @@ function processValue(v, t){
 		switch(t){
 			case "double":
 			case "float":
+			case "Real":
+			case "real":
 			case "Color":
 			case "color":
 			case "ColorRGBA":
@@ -368,7 +407,7 @@ function processValue(v, t){
 		}
 	}
 	else{
-		write("Unprocessed Value: " + v);
+		write("!!!Unprocessed Value: " + v);
 		v = null;
 	}
 
@@ -606,11 +645,11 @@ function processJSON(data, cbFunc){
 						if(wErr){
 							err = "Error: Saving JSON file: " + wErr;
 							write(err);
-							cbFunc(err, opts.returnJSON ? json : null);
 						}
 						else{
 							write("JSON saved to file " + jsonFile);
 						}
+						cbFunc(err, opts.returnJSON ? json : null);
 					});
 				}
 				else{
@@ -731,6 +770,10 @@ function parse(file, options, cbFunc){
 
 						var ov_e_time = process.hrtime(ov_s_time);
 						write("Overall Run Time: " + ov_e_time[0] + "s, " + ov_e_time[1] + "ns");
+
+						saveLog(function(err){
+							cbFunc(err, rObj);
+						});
 					});
 				});
 			})
@@ -769,12 +812,6 @@ function parseSync(file, options){
 
 	var rData = {err: err, data: parsedObj};
 	if(json) rData.json = json;
-
-	var mData = parseMTLFile(parsedObj);
-
-	if(mData && mData.err != -1){
-		rData.material = mData;
-	}
 
 	saveLog();
 
