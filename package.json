@@ -1,10 +1,14 @@
 {
   "name": "fbxasciitojs",
   "version": "0.0.0",
-  "description": "A .fbx ascii file parser.",
+  "description": "nodejs module to parse FBX/Filmbox (.fbx) files to javascript and/or JSON",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/chrispalazzolo/fbxasciitojs.git"
   },
   "keywords": [
     "fbx",
@@ -12,6 +16,10 @@
     "ascii",
     "3d"
   ],
-  "author": "Chris Palazzolo",
-  "license": "MIT"
+  "author": "Chris Palazzolo <chrisp.git@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/chrispalazzolo/fbxasciitojs/issues"
+  },
+  "homepage": "https://github.com/chrispalazzolo/fbxasciitojs"
 }
