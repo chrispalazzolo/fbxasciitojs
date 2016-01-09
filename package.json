@@ -12,9 +12,11 @@
   },
   "keywords": [
     "fbx",
-    "filmbox"
+    "filmbox",
     "ascii",
     "3d"
+    "nodejs",
+    "parser"
   ],
   "author": "Chris Palazzolo <chrisp.git@gmail.com>",
   "license": "MIT",
