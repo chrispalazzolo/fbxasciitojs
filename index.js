@@ -183,10 +183,47 @@ function processObject(){
 			}
 		}
 		else if(line.indexOf(':') > -1){ // key value pair
-			var kv = line.split(':');
-			if(kv[0].toLowerCase() == "property"){
-				var p = processProperty(kv[1]);
-				obj[p.name] = {type:p.type, flags: p.flags, value: p.value};
+			var kv = null;
+			if(line.indexOf('::') > -1){
+				var idx = line.indexOf(':');
+				kv = [line.slice(0, idx), line.slice(idx+1, line.length)];
+			}
+			else{
+				kv = line.split(':');
+			}
+			
+			var p = kv[0];
+			var plc = p.toLowerCase();
+			if(plc == "property"){
+				var pd = processPropertyData(kv[1]);
+				obj[pd.name] = {type:pd.type, flags: pd.flags, value: pd.value};
+			}
+			else if(plc == "connect"){
+				var cd = processConnectData(kv[1]);
+				if(!obj[p]) obj[p] = [];
+				obj[p].push(cd);
+			}
+			else if(kv[1].indexOf(',') > -1){
+				var continued = false; // Do the values span across multiple lines 
+				var d = kv[1];
+				obj[p] = [];
+				do{
+					continued = false;
+					d = cleanStr(d.replace(/, /g, ','));
+					if(d.charAt(d.length - 1) == ','){
+						continued = true;
+						d = d.slice(0, d.length - 1); // remove the last comma
+					}
+					d = d.split(',');
+					for(var i = 0; i < d.length; i++){
+						obj[p].push(processValue(d[i]));
+					}
+
+					if(continued && l_num < last_line && lines[l_num+1].indexOf(':') < 0){
+						l_num++;
+						d = lines[l_num];
+					}
+				}while(continued);
 			}
 			else{
 				obj[kv[0]] = processValue(kv[1]);
@@ -246,7 +283,7 @@ function processObjectName(s){
 	return d;
 }
 
-function processProperty(p){
+function processPropertyData(p){
 	//Property = Name, Type, Flags, Value(s)....,....
 	var rp = {name: '', type: '', flags: '', value: null};
 	if(p){
@@ -275,6 +312,25 @@ function processProperty(p){
 	}
 
 	return rp;
+}
+
+function processConnectData(d){
+	// type, source object/property, destination object/property
+	// ex: "OO", "Model::Cube", "Model::Scene"
+	var ro = {type:'', source:{type:'', name: null}, destination: {type:'', name:null}};
+	if(d){
+		var dp = cleanStr(d, true).split(',');
+		var sdp = null;
+		ro['type'] = dp[0];
+		sdp = dp[1].split('::');
+		ro['source']['type'] = sdp[0];
+		ro['source']['name'] = sdp[1];
+		sdp = dp[2].split('::');
+		ro['destination']['type'] = sdp[0];
+		ro['destination']['name'] = sdp[1];
+	}
+
+	return ro;
 }
 
 function processValue(v, t){
