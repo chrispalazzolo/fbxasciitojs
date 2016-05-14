@@ -16,17 +16,19 @@ function parseFile(file, cbFunc){
 	write("Opening File...");
 	OpenFile(file, 'r', function(err, fd){
 		if(err){
-			errMsg = "Error: Opening file " + file + " (" + err + ")";
-			write(errMsg);
-			cbFunc(errMsg, null);
+			err = "Error: Opening file " + file + " (" + err + ")";
+			write(err);
+			closeFile(fd, err, null, cbFunc);
+			return;
 		}
 
 		write("Getting file stats...")
 		fs.fstat(fd, function(err, stats){
 			if(err){
-				errMsg = "Error: Getting file stats. (" + err + ")";
-				write(errMsg);
-				cbFunc(errMsg, null);
+				err = "Error: Getting file stats. (" + err + ")";
+				write(err);
+				closeFile(fd, err, null, cbFunc);
+				return;
 			}
 
 			write("File Size: " + stats.size);
@@ -35,60 +37,88 @@ function parseFile(file, cbFunc){
 			write("Reading file...");
 			fs.read(fd, buffer, 0, stats.size, 0, function(err, bytesRead, buffer){
 				if(err){
-					errMsg = "Error: Can not read file: " + err;
-					write(errMsg);
+					err = "Error: Can not read file: " + err;
+					write(err);
+					closeFile(fd, err, null, cbFunc);
+					return;
+				}
 
-					cbFunc(errMsg, null);
+				if(buffer.length < 20){
+					err = "Error: File not valid, file length too short";
+					write(err);
+					closeFile(fd, err, null, cbFunc);
+					return;
+				}
+
+				if(buffer.slice(0, 20).toString().indexOf("Binary") > -1){
+					err = "Error: File is Binary FBX file, ASCII only";
+					write(err);
+					closeFile(fd, err, null, cbFunc);
+					return;
 				}
 
 				var str = buffer.toString();
-				
+
 				parseText(str, function(err, obj){
-					write("Closing file...");
-					fs.close(fd, function(c_err){
-						cbFunc(err, obj);
-					})
+					closeFile(fd, err, obj, cbFunc);
 				});
 			});
 		});
 	});	
 }
 
+function closeFile(fd, err, obj, cbFunc){
+	write("Closing file...");
+	fs.close(fd, function(c_err){
+		cbFunc(err, obj);
+	})
+}
+
 function parseFileSync(file){
-	var errMsg = '';
+	var err = '';
 
 	write("Opening file...");
 	var fd = fs.openSync(file, 'r');
-		
-	if(fd !== null && fd != undefined){
-		write("Getting file stats...");
-		var stats = fs.fstatSync(fd);
-		
-		if(stats !== null && stats != undefined){
-			write("File Size: " + stats.size);
-			var buffer = new Buffer(stats.size);
-			write("Reading file...");
-			var bytesRead = fs.readSync(fd, buffer, 0, stats.size, 0);
-			var str = buffer.toString();
-
-			write("Closing file...");
-			fs.closeSync(fd);
-
-			return parseText(str);
-		}
-		else{
-			errMsg = "Error: Retrieving file stats.";
-			write(errMsg);
-
-			fs.closeSync(fd);
-		}
-	}
-	else{
-		errMsg = "Error: Opening file, " + file;
-		write(errMsg);
+	if(fd === null || fd == undefined){
+		err = "Error: Opening file, " + file;
+		return errorSync(fd, err);
 	}
 
-	return {err: errMsg, data: data};
+	write("Getting file stats...");
+	var stats = fs.fstatSync(fd);
+		
+	if(stats === null || stats == undefined){
+		err = "Error: Retrieving file stats.";
+		return errorSync(fd, err);
+	}
+
+	write("File Size: " + stats.size);
+	var buffer = new Buffer(stats.size);
+	write("Reading file...");
+	var bytesRead = fs.readSync(fd, buffer, 0, stats.size, 0);
+	
+	if(buffer.length < 20){
+		err = "Error: Not a valid file, length too small";
+		return errorSync(fd, err);
+	}
+	
+	if(buffer.slice(0, 20).toString().toLowerCase().indexOf("binary") > -1){
+		err = "Error: File is a Binary FBX file, only ASCII";
+		return errorSync(fd, err);
+	}
+
+	var str = buffer.toString();
+
+	write("Closing file...");
+	fs.closeSync(fd);
+
+	return parseText(str);
+}
+
+function errorSync(fd, err){
+	write(err);
+	fs.closeSync(fd);
+	return {err: err, data: null};
 }
 
 function parseText(text, cbFunc){
@@ -757,6 +787,10 @@ function parse(file, options, cbFunc){
 
 			parseFile(file, function(err, parsedObj){
 				var rObj = {err: err, data: parsedObj};
+				if(err){
+					cbFunc(err, rObj);
+					return;
+				}
 				createFolder(function(err){
 					processJSON(parsedObj, function(err, json){
 						if(!err && json != null){
@@ -776,12 +810,13 @@ function parse(file, options, cbFunc){
 						});
 					});
 				});
-			})
+			});
 		}
 	});
 }
 
 function parseSync(file, options){
+	var rData = {err: '', data: null};
 	var ov_s_time = process.hrtime();
 	var s_mem = process.memoryUsage();
 	
@@ -791,12 +826,17 @@ function parseSync(file, options){
 	
 	if(err){
 		write(err);
-		return {err: err, data:null};
+		rData.err = err;
+		return rData;
 	}
 
 	writeLoggingHeader();
 
 	var parsedObj = parseFileSync(file);
+
+	if(parsedObj.err){
+		return parsedObj;
+	}
 
 	createFolder();
 
@@ -810,7 +850,9 @@ function parseSync(file, options){
 	var ov_e_time = process.hrtime(ov_s_time);
 	write("Overall Run Time: " + ov_e_time[0] + "s, " + ov_e_time[1] + "ns");
 
-	var rData = {err: err, data: parsedObj};
+	rData.err = err;
+	rData.data = parsedObj;
+
 	if(json) rData.json = json;
 
 	saveLog();
