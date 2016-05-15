@@ -11,14 +11,12 @@ var last_line = 0;
 var lines = null;
 
 function parseFile(file, cbFunc){
-	var errMsg = '';
-	
 	write("Opening File...");
 	OpenFile(file, 'r', function(err, fd){
 		if(err){
 			err = "Error: Opening file " + file + " (" + err + ")";
 			write(err);
-			closeFile(fd, err, null, cbFunc);
+			cbFunc(err, null);
 			return;
 		}
 
@@ -42,24 +40,20 @@ function parseFile(file, cbFunc){
 					closeFile(fd, err, null, cbFunc);
 					return;
 				}
-
 				if(buffer.length < 20){
 					err = "Error: File not valid, file length too short";
 					write(err);
 					closeFile(fd, err, null, cbFunc);
 					return;
 				}
-
 				if(buffer.slice(0, 20).toString().indexOf("Binary") > -1){
-					err = "Error: File is Binary FBX file, ASCII only";
+					err = "Error: File is a FBX Binary file, can parse ASCII only";
 					write(err);
 					closeFile(fd, err, null, cbFunc);
 					return;
 				}
-
-				var str = buffer.toString();
-
-				parseText(str, function(err, obj){
+				
+				parseText(buffer.toString(), function(err, obj){
 					closeFile(fd, err, obj, cbFunc);
 				});
 			});
