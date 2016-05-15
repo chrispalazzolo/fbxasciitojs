@@ -1,6 +1,6 @@
 {
   "name": "fbxasciitojs",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "nodejs module to parse FBX/Filmbox (.fbx) files to javascript and/or JSON",
   "main": "index.js",
   "scripts": {

@@ -1,7 +1,7 @@
 fbxasciitojs
 =======
 
-A nodejs module to parses FBX/Filmbox (.fbx) files to javascript or JSON.
+A nodejs module to parses FBX/Filmbox (.fbx) ASCII files (not binary) to javascript or JSON.
 
 Overview
 --------
@@ -84,3 +84,4 @@ MIT
 ## Release History
 
 * 0.0.0 Initial Release
+* 0.1.0 Add binary file check and cleaned up error handling
